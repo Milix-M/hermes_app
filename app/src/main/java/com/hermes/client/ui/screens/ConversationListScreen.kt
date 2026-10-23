@@ -225,6 +225,13 @@ fun ConversationDrawerContent(
                 stringResource(R.string.settings),
                 style = Hermes.type.labelSmall.copy(color = Hermes.colors.onSurfaceVariant),
             )
+            Spacer(Modifier.weight(1f))
+            BasicText(
+                "v" + com.hermes.client.BuildConfig.VERSION_NAME,
+                style = Hermes.type.labelSmall.copy(
+                    color = Hermes.colors.onSurfaceVariant.copy(alpha = 0.6f)
+                ),
+            )
         }
     }
 

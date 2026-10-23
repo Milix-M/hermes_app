@@ -13,14 +13,14 @@ plugins {
 
 android {
     namespace = "com.hermes.client"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.hermes.client"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.2"
+        versionCode = 2
+        versionName = "0.7.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -82,6 +82,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.compose.unstyled)
     implementation(libs.navigation.compose)
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)

@@ -23,7 +23,7 @@ jobs:
         run: |
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          sdkmanager --install "platform-tools" "platforms;android-34" "platforms;android-35" "build-tools;34.0.0" "build-tools;35.0.0"
       - name: Run tests with 100% line coverage gate
         run: ./gradlew :app:jacocoTestReport :app:jacocoCoverageVerification --no-daemon
       - name: Build debug APK

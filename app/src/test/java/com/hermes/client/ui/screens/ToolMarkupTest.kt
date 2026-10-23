@@ -137,7 +137,7 @@ class ToolMarkupTest {
         val summary = summarizeMachineJson(
             "{\"tool_name\":\"web_search\",\"results\":[{\"title\":\"Hermes docs\",\"url\":\"https://docs.example/hermes\"}]}"
         )
-        assertEquals("web_search: Hermes docs — https://docs.example/hermes", summary)
+        assertEquals("web search: Hermes docs — https://docs.example/hermes", summary)
     }
 
     @Test
@@ -168,6 +168,7 @@ class ToolMarkupTest {
     @Test
     fun summarizeJsonObject_keyFallback() {
         assertEquals("tool: a=1, b=2", summarizeJsonObject(parseObj("{\"a\":1,\"b\":2}")))
+        assertTrue(summarizeJsonObject(parseObj("{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5}")).endsWith("…"))
     }
 
     @Test
@@ -231,6 +232,55 @@ class ToolMarkupTest {
     fun foldForLog_combines() {
         assertEquals("hi · web search: bulk", foldForLog("hi <untrusted_tool_result source=\"web_search\">bulk</untrusted_tool_result>"))
         assertEquals("web search: bulk", foldForLog("<untrusted_tool_result source=\"web_search\">bulk</untrusted_tool_result>"))
+    }
+
+    @Test
+    fun embeddedMachineJson_foldsOutOfProse() {
+        val (clean, folded) = foldEmbeddedJson(
+            "調べたよ\n{\"success\":true,\"name\":\"grounded-citations\",\"x\":1}\n以上"
+        )
+        assertEquals("調べたよ\n\n以上", clean)
+        assertEquals(1, folded.size)
+        assertTrue(folded[0].summary.startsWith("grounded-citations: "))
+        assertTrue(folded[0].detail.contains("\"success\": true"))
+    }
+
+    @Test
+    fun embeddedJson_insideFence_stays() {
+        val raw = "例:\n```json\n{\"success\":true,\"name\":\"x\"}\n```\nおわり"
+        val (clean, folded) = foldEmbeddedJson(raw)
+        assertEquals(raw, clean)
+        assertTrue(folded.isEmpty())
+    }
+
+    @Test
+    fun embeddedJson_nonMachineOrBroken_stays() {
+        val (clean, folded) = foldEmbeddedJson("値は {\"answer\": 42} です")
+        assertEquals("値は {\"answer\": 42} です", clean)
+        assertTrue(folded.isEmpty())
+        val (clean2, folded2) = foldEmbeddedJson("壊れた {\"a\": 1")
+        assertEquals("壊れた {\"a\": 1", clean2)
+        assertTrue(folded2.isEmpty())
+    }
+
+    @Test
+    fun takeBalanced_handlesNestingAndStrings() {
+        val lines = listOf("{\"a\":\"}not end\",\"b\":[1,{\"c\":2}]}", "tail")
+        val (seg, end) = takeBalanced(lines, 0)
+        assertEquals("{\"a\":\"}not end\",\"b\":[1,{\"c\":2}]}", seg)
+        assertEquals(0, end)
+        val (seg2, _) = takeBalanced(listOf("{\"a\": 1", "still open"), 0)
+        assertEquals(null, seg2)
+        val (seg3, _) = takeBalanced(listOf("{\"a\": 1}}", "x"), 0)
+        assertEquals(null, seg3)
+    }
+
+    @Test
+    fun splitUserFacing_extractsEmbedded() {
+        val split = splitUserFacing("結果:\n{\"tool_name\":\"web_search\",\"output\":\"ok\"}\n以上")
+        assertEquals("結果:\n\n以上", split.visible)
+        assertEquals(1, split.folded.size)
+        assertEquals("web search: ok", split.folded[0].summary)
     }
 
     private fun parseObj(raw: String) =

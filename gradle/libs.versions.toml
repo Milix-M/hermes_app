@@ -17,6 +17,7 @@ robolectric = "4.13"
 test-core = "1.5.0"
 
 [libraries]
+compose-unstyled = { module = "com.composables:composeunstyled", version = "1.49.9" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
 lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }

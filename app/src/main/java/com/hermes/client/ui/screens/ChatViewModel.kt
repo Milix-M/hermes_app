@@ -512,7 +512,7 @@ internal fun summarizeJsonObject(o: JsonObject): String {
         if (!v.isString) return null
         return v.content.trim().takeIf { it.isNotEmpty() }
     }
-    val name = s("name") ?: s("tool_name") ?: s("tool") ?: "tool"
+    val name = (s("name") ?: s("tool_name") ?: s("tool") ?: "tool").replace('_', ' ')
     s("output")?.let { return "$name: ${it.take(140)}" }
     s("error")?.let { return "$name [error]: ${it.take(140)}" }
     val results = o["results"] as? JsonArray
@@ -587,6 +587,15 @@ internal fun splitUserFacing(text: String): VisibleSplit {
         folded.add(Folded(summary, rest.trim().take(1000)))
         rest = ""
     }
+    if (rest.isNotBlank()) {
+        // Machine JSON embedded mid-prose (agent pasted a tool dump into the
+        // reply) folds too — except inside fenced code samples, which stay.
+        val embedded = foldEmbeddedJson(rest)
+        if (embedded.second.isNotEmpty()) {
+            rest = embedded.first
+            folded.addAll(embedded.second)
+        }
+    }
     return VisibleSplit(rest, folded)
 }
 
@@ -613,6 +622,72 @@ internal fun untrustedDetail(block: String, max: Int = 1500): String {
     val inner = AnyMarkupTag.replace(TrustBoilerplate.replace(block, " "), " ")
         .split(WhitespaceRun).filter { it.isNotEmpty() }.joinToString(" ")
     return if (inner.length <= max) inner else inner.take(max) + "…"
+}
+
+/**
+ * Fold machine-JSON payloads embedded mid-prose (agent pasted a tool dump
+ * into the reply). Fenced code samples are left alone — those are docs.
+ * Returns cleaned text plus folded entries.
+ */
+internal fun foldEmbeddedJson(text: String): Pair<String, List<Folded>> {
+    val lines = text.split('\n')
+    val kept = mutableListOf<String>()
+    val folded = mutableListOf<Folded>()
+    var inFence = false
+    var i = 0
+    while (i < lines.size) {
+        val line = lines[i]
+        if (line.trimStart().startsWith("```")) {
+            inFence = !inFence
+            kept.add(line)
+            i++
+            continue
+        }
+        val trimmed = line.trimStart()
+        if (!inFence && (trimmed.startsWith("{") || trimmed.startsWith("["))) {
+            val (segment, end) = takeBalanced(lines, i)
+            val summary = segment?.let { summarizeMachineJson(it.trim()) }
+            if (segment != null && summary != null) {
+                folded.add(Folded(summary, prettyMachineJson(segment.trim())))
+                i = end + 1
+                continue
+            }
+        }
+        kept.add(line)
+        i++
+    }
+    return kept.joinToString("\n") to folded
+}
+
+/** Balanced {...}/[...] span starting at lines[from]. Null when it never balances. */
+internal fun takeBalanced(lines: List<String>, from: Int): Pair<String?, Int> {
+    val sb = StringBuilder()
+    var depth = 0
+    var inStr = false
+    var esc = false
+    for (j in from until lines.size) {
+        val line = lines[j]
+        if (line.trimStart().startsWith("```")) break
+        for (ch in line) {
+            if (inStr) {
+                when {
+                    esc -> esc = false
+                    ch == '\\' -> esc = true
+                    ch == '"' -> inStr = false
+                }
+            } else {
+                when (ch) {
+                    '"' -> inStr = true
+                    '{', '[' -> depth++
+                    '}', ']' -> depth--
+                }
+            }
+        }
+        sb.append(line).append('\n')
+        if (depth == 0) return sb.toString().trimEnd() to j
+        if (depth < 0) break
+    }
+    return null to from
 }
 
 /** Rendered activity-log entry: summary line first, detail below for the expanded view. */
